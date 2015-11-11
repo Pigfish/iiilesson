@@ -1,0 +1,66 @@
+#抓取單一商品連結網址
+def findurl(soup,count_items):
+    food_detail = open("711_cookie1-1.txt","a+")
+    count=0
+    for ele in soup.select('.marginB5px a'):
+        species=ele['href'].split("?ID=")[1]
+        param=species.split("&catid=")
+        cid=param[1]
+        pid=param[0]
+        x = cid+" "+ pid +" "+ ele.text.strip()+" "+ ele['href']+"\n"
+        food_detail.write( x.encode("utf-8") )
+        count +=1 #計算商品數目(累加)
+    food_detail.close()    
+    return count
+    
+        
+
+#抓取第一層目錄清單
+def findlist(soup_main):
+    submenu_list=[]
+    count=0
+    for ele in soup_main.select('.l1on li a'):
+        m=re.match(r".*(rui003)",ele['href'])
+        if m is not None:
+            submenu_list.append(ele.text.strip())  
+    return submenu_list
+
+#主程式
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+import time
+import requests
+from bs4 import BeautifulSoup
+import re
+
+
+driver = webdriver.Firefox()
+driver.get("http://mart.ibon.com.tw/mart/rui002.faces?catid=10868") #茶飲料 / 礦泉水的網址
+time.sleep(2)
+soup_main = BeautifulSoup(driver.page_source,"html.parser")
+submenu_list = findlist(soup_main)
+
+
+del submenu_list[0]
+#移除某個不需要的item, 如:礦泉水 好康活動 <= 因為裡面都是吃的(加價購)而非飲料
+
+count_items=0 
+
+for i in range(0,len(submenu_list)):
+#for i in range(0,3):
+    driver.find_element_by_link_text(submenu_list[i]).click()
+    time.sleep(2)
+    soup_second = BeautifulSoup(driver.page_source,"html.parser")
+    
+    #只要有下一頁,就會繼續
+    while (len(soup_second.select('.gonum'))!=0 and soup_second.select('.gonum ul li a')[-1].text.strip()==u'下一頁'):
+        temp = findurl(soup_second,count_items)
+        count_items += temp
+        driver.find_element_by_partial_link_text('下一頁').click()
+        soup_second = BeautifulSoup(driver.page_source,"html.parser")
+        time.sleep(2)
+    temp = findurl(soup_second,count_items)
+    count_items += temp #累加該商品類別的商品數量
+
+print "總共抓取: %s 筆"%count_items
+driver.close()
